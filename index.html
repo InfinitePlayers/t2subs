@@ -48,7 +48,7 @@
             padding: 10px;
             border-radius: 10px;
             display: flex;
-            flex-direction: column;
+            flex-direction: column-reverse;
             align-items: center;
         }
         .subtitle {
@@ -99,7 +99,7 @@
     <script>
         let recognition;
         let transcriptHistory = [];
-        let currentWords = [];
+        let currentLine = [];
         const maxWordsPerLine = 7;
 
         function toggleSpeechRecognition() {
@@ -110,11 +110,8 @@
                 recognition.lang = 'en-GB';
 
                 recognition.onresult = (event) => {
-                    let transcript = '';
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        transcript += event.results[i][0].transcript + ' ';
-                    }
-                    processTranscript(transcript.trim(), event.results[event.results.length - 1].isFinal);
+                    let transcript = event.results[event.results.length - 1][0].transcript.trim();
+                    processTranscript(transcript, event.results[event.results.length - 1].isFinal);
                 };
             }
             
@@ -129,13 +126,12 @@
 
         function processTranscript(text, isFinal) {
             let words = text.split(' ');
-            currentWords = currentWords.concat(words);
-            if (currentWords.length >= maxWordsPerLine || isFinal) {
-                addSubtitle(currentWords.join(' '));
-                currentWords = [];
-            } else {
-                updateRealTimeSubtitle(currentWords.join(' '));
+            currentLine = currentLine.concat(words);
+            if (currentLine.length >= maxWordsPerLine || isFinal) {
+                addSubtitle(currentLine.slice(0, maxWordsPerLine).join(' '));
+                currentLine = currentLine.slice(maxWordsPerLine);
             }
+            updateRealTimeSubtitle(currentLine.join(' '));
         }
 
         function updateRealTimeSubtitle(text) {
@@ -154,18 +150,18 @@
             const subtitle = document.createElement('div');
             subtitle.classList.add('subtitle', 'active');
             subtitle.textContent = text;
-            subtitleContainer.appendChild(subtitle);
+            subtitleContainer.insertBefore(subtitle, subtitleContainer.firstChild);
             
             const subtitles = subtitleContainer.querySelectorAll('.subtitle');
             if (subtitles.length > 6) {
-                subtitles[0].remove();
+                subtitles[subtitles.length - 1].remove();
             }
             
             subtitles.forEach((sub, index) => {
                 sub.classList.remove('active', 'fading', 'old');
-                if (index === subtitles.length - 1) {
+                if (index === 0) {
                     sub.classList.add('active');
-                } else if (index === subtitles.length - 2) {
+                } else if (index === 1) {
                     sub.classList.add('fading');
                 } else {
                     sub.classList.add('old');
