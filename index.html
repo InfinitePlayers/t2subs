@@ -96,7 +96,8 @@
     <script>
         let recognition;
         let transcriptHistory = [];
-        let currentLine = '';
+        let currentLine = [];
+        const maxWordsPerLine = 7;
 
         function toggleSpeechRecognition() {
             if (!recognition) {
@@ -110,7 +111,7 @@
                     for (let i = event.resultIndex; i < event.results.length; i++) {
                         transcript += event.results[i][0].transcript + ' ';
                     }
-                    updateRealTimeSubtitle(transcript.trim());
+                    processTranscript(transcript.trim(), event.results[event.results.length - 1].isFinal);
                 };
             }
             
@@ -121,6 +122,16 @@
                 recognition.start();
                 document.querySelector('button').textContent = 'Stop Subtitles';
             }
+        }
+
+        function processTranscript(text, isFinal) {
+            let words = text.split(' ');
+            currentLine = currentLine.concat(words);
+            if (currentLine.length >= maxWordsPerLine || isFinal) {
+                addSubtitle(currentLine.join(' '));
+                currentLine = [];
+            }
+            updateRealTimeSubtitle(currentLine.join(' '));
         }
 
         function updateRealTimeSubtitle(text) {
@@ -134,15 +145,28 @@
             lastSubtitle.textContent = text;
         }
 
-        function commitSubtitle() {
+        function addSubtitle(text) {
             const subtitleContainer = document.getElementById('subtitles');
+            const subtitle = document.createElement('div');
+            subtitle.classList.add('subtitle', 'active');
+            subtitle.textContent = text;
+            subtitleContainer.appendChild(subtitle);
+            
             const subtitles = subtitleContainer.querySelectorAll('.subtitle');
-            if (subtitles.length > 0) {
-                subtitles[subtitles.length - 1].classList.add('finalized');
-            }
             if (subtitles.length > 6) {
                 subtitles[0].remove();
             }
+            
+            subtitles.forEach((sub, index) => {
+                sub.classList.remove('active', 'fading', 'old');
+                if (index === subtitles.length - 1) {
+                    sub.classList.add('active');
+                } else if (index === subtitles.length - 2) {
+                    sub.classList.add('fading');
+                } else {
+                    sub.classList.add('old');
+                }
+            });
         }
         
         function saveToHistory(text) {
