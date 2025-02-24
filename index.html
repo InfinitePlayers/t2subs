@@ -48,7 +48,7 @@
             padding: 10px;
             border-radius: 10px;
             display: flex;
-            flex-direction: column-reverse;
+            flex-direction: column;
             align-items: center;
         }
         .subtitle {
@@ -99,7 +99,7 @@
     <script>
         let recognition;
         let transcriptHistory = [];
-        let currentLine = [];
+        let currentWords = [];
         const maxWordsPerLine = 7;
 
         function toggleSpeechRecognition() {
@@ -129,12 +129,13 @@
 
         function processTranscript(text, isFinal) {
             let words = text.split(' ');
-            currentLine = currentLine.concat(words);
-            if (currentLine.length >= maxWordsPerLine || isFinal) {
-                addSubtitle(currentLine.join(' '));
-                currentLine = [];
+            currentWords = currentWords.concat(words);
+            if (currentWords.length >= maxWordsPerLine || isFinal) {
+                addSubtitle(currentWords.join(' '));
+                currentWords = [];
+            } else {
+                updateRealTimeSubtitle(currentWords.join(' '));
             }
-            updateRealTimeSubtitle(currentLine.join(' '));
         }
 
         function updateRealTimeSubtitle(text) {
@@ -153,31 +154,23 @@
             const subtitle = document.createElement('div');
             subtitle.classList.add('subtitle', 'active');
             subtitle.textContent = text;
-            subtitleContainer.insertBefore(subtitle, subtitleContainer.firstChild);
+            subtitleContainer.appendChild(subtitle);
             
             const subtitles = subtitleContainer.querySelectorAll('.subtitle');
             if (subtitles.length > 6) {
-                subtitles[subtitles.length - 1].remove();
+                subtitles[0].remove();
             }
             
             subtitles.forEach((sub, index) => {
                 sub.classList.remove('active', 'fading', 'old');
-                if (index === 0) {
+                if (index === subtitles.length - 1) {
                     sub.classList.add('active');
-                } else if (index === 1) {
+                } else if (index === subtitles.length - 2) {
                     sub.classList.add('fading');
                 } else {
                     sub.classList.add('old');
                 }
             });
-        }
-        
-        function saveToHistory(text) {
-            transcriptHistory.push(text);
-            const historyContainer = document.getElementById('history');
-            const historyEntry = document.createElement('div');
-            historyEntry.textContent = text;
-            historyContainer.appendChild(historyEntry);
         }
         
         function downloadTranscript() {
