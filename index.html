@@ -1,9 +1,202 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <!-- head definitions go here -->
-    </head>
-    <body>
-        <!-- the content goes here -->
-    </body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Speech to Subtitles</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+            color: white;
+            margin: 0;
+            overflow: hidden;
+            flex-direction: column;
+        }
+        .title-bar {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            flex-wrap: wrap;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .subtitle-container {
+            position: fixed;
+            bottom: 10%;
+            width: 90%;
+            text-align: center;
+            font-size: var(--subtitle-size, 2em);
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column-reverse;
+            align-items: center;
+        }
+        .subtitle {
+            opacity: 0.2;
+            transition: opacity 0.05s ease-out;
+            margin: 5px 0;
+            word-wrap: break-word;
+        }
+        .subtitle.active {
+            opacity: 1;
+            font-weight: bold;
+        }
+        .subtitle.fading {
+            opacity: 0.6;
+        }
+        .subtitle.old {
+            opacity: 0.3;
+        }
+        .history-container {
+            position: fixed;
+            top: 50px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 80vh;
+            overflow-y: auto;
+            font-size: 1em;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="title-bar">
+        <div class="controls">
+            <button onclick="toggleSpeechRecognition()">Start Subtitles</button>
+            <button onclick="toggleHistory()">Show History</button>
+            <button onclick="downloadTranscript()">Download Transcript</button>
+        </div>
+        <div class="controls">
+            <label for="fontSize">Font Size:</label>
+            <input type="range" id="fontSize" min="1" max="4" step="0.1" value="2" oninput="updateFontSize(this.value)">
+        </div>
+    </div>
+    <div class="subtitle-container" id="subtitles"></div>
+    <div class="history-container" id="history"></div>
+    
+    <script>
+        let recognition;
+        let transcriptHistory = [];
+        let currentLine = [];
+        const maxWordsPerLine = 7;
+
+        function toggleSpeechRecognition() {
+            if (!recognition) {
+                recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-GB';
+
+                recognition.onresult = (event) => {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript + ' ';
+                    }
+                    processTranscript(transcript.trim(), event.results[event.results.length - 1].isFinal);
+                };
+            }
+            
+            if (recognition.running) {
+                recognition.stop();
+                document.querySelector('button').textContent = 'Start Subtitles';
+            } else {
+                recognition.start();
+                document.querySelector('button').textContent = 'Stop Subtitles';
+            }
+        }
+
+        function processTranscript(text, isFinal) {
+            let words = text.split(' ');
+            currentLine = currentLine.concat(words);
+            if (currentLine.length >= maxWordsPerLine || isFinal) {
+                addSubtitle(currentLine.join(' '));
+                currentLine = [];
+            }
+            updateRealTimeSubtitle(currentLine.join(' '));
+        }
+
+        function updateRealTimeSubtitle(text) {
+            const subtitleContainer = document.getElementById('subtitles');
+            let lastSubtitle = subtitleContainer.lastElementChild;
+            if (!lastSubtitle || lastSubtitle.classList.contains('finalized')) {
+                lastSubtitle = document.createElement('div');
+                lastSubtitle.classList.add('subtitle', 'active');
+                subtitleContainer.appendChild(lastSubtitle);
+            }
+            lastSubtitle.textContent = text;
+        }
+
+        function addSubtitle(text) {
+            const subtitleContainer = document.getElementById('subtitles');
+            const subtitle = document.createElement('div');
+            subtitle.classList.add('subtitle', 'active');
+            subtitle.textContent = text;
+            subtitleContainer.insertBefore(subtitle, subtitleContainer.firstChild);
+            
+            const subtitles = subtitleContainer.querySelectorAll('.subtitle');
+            if (subtitles.length > 6) {
+                subtitles[subtitles.length - 1].remove();
+            }
+            
+            subtitles.forEach((sub, index) => {
+                sub.classList.remove('active', 'fading', 'old');
+                if (index === 0) {
+                    sub.classList.add('active');
+                } else if (index === 1) {
+                    sub.classList.add('fading');
+                } else {
+                    sub.classList.add('old');
+                }
+            });
+        }
+        
+        function saveToHistory(text) {
+            transcriptHistory.push(text);
+            const historyContainer = document.getElementById('history');
+            const historyEntry = document.createElement('div');
+            historyEntry.textContent = text;
+            historyContainer.appendChild(historyEntry);
+        }
+        
+        function downloadTranscript() {
+            const textToSave = transcriptHistory.join('\n');
+            const blob = new Blob([textToSave], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'transcript.txt';
+            link.click();
+        }
+        
+        function updateFontSize(value) {
+            document.documentElement.style.setProperty('--subtitle-size', `${value}em`);
+        }
+        
+        function toggleHistory() {
+            const historyContainer = document.getElementById('history');
+            historyContainer.style.display = historyContainer.style.display === 'none' ? 'block' : 'none';
+        }
+    </script>
+</body>
 </html>
